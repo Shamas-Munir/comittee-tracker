@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Committee Payment Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    /* Container to allow horizontal scroll on small screens */
+    .table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 600px; /* keeps table readable */
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+      word-wrap: break-word;
+    }
+
+    th {
+      background: #f2f2f2;
+    }
+
+    input {
+      width: 60px;
+      text-align: center;
+      font-size: 1em;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+
+    tfoot td {
+      font-weight: bold;
+      background: #e8f5e9;
+    }
+
+    button {
+      margin: 5px;
+      padding: 8px 15px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    /* Smaller input fields & padding for mobile */
+    @media (max-width: 600px) {
+      body {
+        margin: 5px;
+      }
+      input {
+        width: 50px;
+        font-size: 0.9em;
+      }
+      th, td {
+        padding: 4px;
+        font-size: 0.85em;
+      }
+      button {
+        font-size: 0.9em;
+        padding: 6px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h2>Committee Payment Tracker</h2>
+
+<div style="text-align:center;">
+  <button id="clearBtn">Clear All Data</button>
+  <button id="toggleTotalsBtn">Hide Daily Totals</button>
+</div>
+
+<div class="table-container">
+  <table id="paymentTable" aria-label="Committee payment tracker table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>No. of Committees</th>
+        <!-- Date headers inserted dynamically -->
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Shamas</td><td>4</td></tr>
+      <tr><td>Arshuman</td><td>1</td></tr>
+      <tr><td>M.Ali</td><td>1</td></tr>
+      <tr><td>Azan</td><td>1</td></tr>
+      <tr><td>Hamdan</td><td>1</td></tr>
+      <tr><td>A.Hadi</td><td>1</td></tr>
+      <tr><td>Mudassar</td><td>2</td></tr>
+      <tr><td>A.Hanan</td><td>1</td></tr>
+      <tr><td>Ameer Ali</td><td>2</td></tr>
+      <tr><td>Ahmed</td><td>2</td></tr>
+      <tr><td>Mutahir</td><td>2</td></tr>
+      <tr><td>Hamad</td><td>2</td></tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2">Daily Total</td>
+        <!-- Daily totals inserted dynamically -->
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<script>
+/* Your original JavaScript stays the same */
+(() => {
+  const table = document.getElementById("paymentTable");
+  const theadRow = table.querySelector("thead tr");
+  const tbody = table.querySelector("tbody");
+  const tfootRow = table.querySelector("tfoot tr");
+  
+  const baseStartDate = new Date("2025-08-11");
+  const daysCount = 10;
+  
+  function formatDate(d) {
+    const options = { day: "numeric", month: "short" };
+    return d.toLocaleDateString(undefined, options);
+  }
+  
+  function generateDateArray(startDateStr) {
+    const startDate = new Date(startDateStr);
+    const dates = [];
+    for (let i = 0; i < daysCount; i++) {
+      let d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }
+  
+  function saveData(name, dayIndex, value) {
+    let data = JSON.parse(localStorage.getItem("committeeData") || "{}");
+    if (!data[name]) data[name] = {};
+    data[name][dayIndex] = value;
+    localStorage.setItem("committeeData", JSON.stringify(data));
+  }
+  function getSavedData(name, dayIndex) {
+    let data = JSON.parse(localStorage.getItem("committeeData") || "{}");
+    return data[name]?.[dayIndex] || "";
+  }
+  
+  let currentCycleStartStr = "";
+  let dateArray = [];
+  const footerStartIndex = 1;
+  
+  function buildTableForCycle(startDateStr) {
+    dateArray = generateDateArray(startDateStr);
+    
+    while (theadRow.children.length > 2) theadRow.removeChild(theadRow.lastChild);
+    for (let d of dateArray) {
+      let th = document.createElement("th");
+      th.textContent = formatDate(d);
+      theadRow.appendChild(th);
+    }
+    let totalTh = document.createElement("th");
+    totalTh.textContent = "Total";
+    theadRow.appendChild(totalTh);
+    
+    for (let row of tbody.rows) {
+      while (row.cells.length > 2) row.deleteCell(-1);
+    }
+    for (let row of tbody.rows) {
+      for (let i = 0; i < daysCount; i++) {
+        let cell = row.insertCell(-1);
+        let input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.step = "any";
+        input.setAttribute("aria-label", `${row.cells[0].innerText} payment on ${formatDate(dateArray[i])}`);
+        const savedValue = getSavedData(row.cells[0].innerText, i);
+        if (savedValue !== "") input.value = savedValue;
+        input.addEventListener("change", () => {
+          saveData(row.cells[0].innerText, i, input.value);
+          updateTotals();
+        });
+        cell.appendChild(input);
+      }
+      row.insertCell(-1);
+    }
+    
+    while (tfootRow.cells.length > 1) tfootRow.removeChild(tfootRow.lastChild);
+    for (let i = 0; i < daysCount; i++) {
+      let td = document.createElement("td");
+      td.textContent = "0";
+      tfootRow.appendChild(td);
+    }
+    let grandTotalCell = document.createElement("td");
+    grandTotalCell.textContent = "0";
+    tfootRow.appendChild(grandTotalCell);
+    
+    updateTotals();
+  }
+  
+  function getCurrentCycleStart() {
+    const today = new Date();
+    const diffTime = today.getTime() - baseStartDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const cycleNumber = diffDays >= 0 ? Math.floor(diffDays / daysCount) : 0;
+    const cycleStartDate = new Date(baseStartDate);
+    cycleStartDate.setDate(baseStartDate.getDate() + cycleNumber * daysCount);
+    return cycleStartDate.toISOString().slice(0,10);
+  }
+  
+  function updateTotals() {
+    for (let row of tbody.rows) {
+      let sum = 0;
+      for (let i = 2; i < 2 + daysCount; i++) {
+        const input = row.cells[i].querySelector("input");
+        sum += Number(input.value) || 0;
+      }
+      row.cells[2 + daysCount].textContent = sum.toFixed(2);
+    }
+    let grandTotal = 0;
+    for (let col = 0; col < daysCount; col++) {
+      let sum = 0;
+      for (let row of tbody.rows) {
+        const input = row.cells[col + 2].querySelector("input");
+        sum += Number(input.value) || 0;
+      }
+      tfootRow.cells[footerStartIndex + col].textContent = sum.toFixed(2);
+      grandTotal += sum;
+    }
+    tfootRow.cells[footerStartIndex + daysCount].textContent = grandTotal.toFixed(2);
+  }
+  
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if (confirm("Clear all saved data?")) {
+      localStorage.removeItem("committeeData");
+      for (let row of tbody.rows) {
+        for (let i = 2; i < 2 + daysCount; i++) {
+          row.cells[i].querySelector("input").value = "";
+        }
+        row.cells[2 + daysCount].textContent = "";
+      }
+      for (let i = 0; i < daysCount; i++) {
+        tfootRow.cells[footerStartIndex + i].textContent = "0";
+      }
+      tfootRow.cells[footerStartIndex + daysCount].textContent = "0";
+    }
+  });
+  
+  const toggleBtn = document.getElementById("toggleTotalsBtn");
+  let totalsVisible = true;
+  toggleBtn.addEventListener("click", () => {
+    totalsVisible = !totalsVisible;
+    tfootRow.style.display = totalsVisible ? "" : "none";
+    toggleBtn.textContent = totalsVisible ? "Hide Daily Totals" : "Show Daily Totals";
+  });
+  
+  currentCycleStartStr = getCurrentCycleStart();
+  buildTableForCycle(currentCycleStartStr);
+  
+  setInterval(() => {
+    const newCycleStart = getCurrentCycleStart();
+    if (newCycleStart !== currentCycleStartStr) {
+      currentCycleStartStr = newCycleStart;
+      buildTableForCycle(currentCycleStartStr);
+    }
+  }, 60000);
+})();
+</script>
+
+</body>
+</html>
