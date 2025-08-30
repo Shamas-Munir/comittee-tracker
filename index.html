@@ -17,7 +17,6 @@
     .header input {
       font-size: 1em;
       padding: 5px 10px;
-      width: 200px;
     }
     table {
       border-collapse: collapse;
@@ -51,6 +50,19 @@
       font-size: 1em;
       cursor: pointer;
     }
+
+    /* Empty vs filled input colors */
+    input.empty {
+      background-color: #ffe6e6; /* light red */
+    }
+    input.filled {
+      background-color: #e6ffe6; /* light green */
+    }
+
+    /* Highlight for current day */
+    .today-col {
+      background-color: #fff3b0 !important; /* light yellow */
+    }
   </style>
 </head>
 <body>
@@ -58,11 +70,11 @@
 <div class="header">
   <div>
     <label>Committee Holder: </label>
-    <input type="text" id="holderName" placeholder="Enter holder name">
+    <input type="text" id="holderName" placeholder="Enter holder name" class="empty">
   </div>
   <div>
     <label>Committee No: </label>
-    <input type="text" id="committeeNo" placeholder="Enter committee no">
+    <input type="number" id="committeeNo" placeholder="No" maxlength="2" style="width:60px;" class="empty">
   </div>
 </div>
 
@@ -110,6 +122,13 @@
 
   const holderInput = document.getElementById("holderName");
   const committeeNoInput = document.getElementById("committeeNo");
+
+  // Restrict committeeNo to 2 digits
+  committeeNoInput.addEventListener("input", function() {
+    if(this.value.length > 2) {
+      this.value = this.value.slice(0, 2);
+    }
+  });
 
   // Load saved header data
   holderInput.value = localStorage.getItem("committeeHolder") || "";
@@ -159,19 +178,28 @@
   function buildTableForCycle(startDateStr) {
     dateArray = generateDateArray(startDateStr);
 
+    // remove old headers
     while (theadRow.children.length > 2) theadRow.removeChild(theadRow.lastChild);
-    for (let d of dateArray) {
+
+    // build headers with highlight
+    const todayStr = new Date().toDateString();
+    for (let i = 0; i < dateArray.length; i++) {
       let th = document.createElement("th");
-      th.textContent = formatDate(d);
+      th.textContent = formatDate(dateArray[i]);
+      if (dateArray[i].toDateString() === todayStr) {
+        th.classList.add("today-col");
+      }
       theadRow.appendChild(th);
     }
     let totalTh = document.createElement("th");
     totalTh.textContent = "Total";
     theadRow.appendChild(totalTh);
 
+    // reset rows
     for (let row of tbody.rows) {
       while (row.cells.length > 2) row.deleteCell(-1);
     }
+
     for (let row of tbody.rows) {
       for (let i = 0; i < daysCount; i++) {
         let cell = row.insertCell(-1);
@@ -179,9 +207,25 @@
         input.type = "number";
         input.min = "0";
         input.step = "any";
-        input.setAttribute("aria-label", `${row.cells[0].innerText} payment on ${formatDate(dateArray[i])}`);
+        input.classList.add("empty");
+        if (dateArray[i].toDateString() === todayStr) {
+          cell.classList.add("today-col");
+        }
         const savedValue = getSavedData(row.cells[0].innerText, i);
-        if (savedValue !== "") input.value = savedValue;
+        if (savedValue !== "") {
+          input.value = savedValue;
+          input.classList.remove("empty");
+          input.classList.add("filled");
+        }
+        input.addEventListener("input", () => {
+          if (input.value.trim() === "") {
+            input.classList.add("empty");
+            input.classList.remove("filled");
+          } else {
+            input.classList.add("filled");
+            input.classList.remove("empty");
+          }
+        });
         input.addEventListener("change", () => {
           saveData(row.cells[0].innerText, i, input.value);
           updateTotals();
@@ -195,6 +239,9 @@
     for (let i = 0; i < daysCount; i++) {
       let td = document.createElement("td");
       td.textContent = "0";
+      if (dateArray[i].toDateString() === todayStr) {
+        td.classList.add("today-col");
+      }
       tfootRow.appendChild(td);
     }
     let grandTotalCell = document.createElement("td");
@@ -241,7 +288,10 @@
       localStorage.removeItem("committeeData");
       for (let row of tbody.rows) {
         for (let i = 2; i < 2 + daysCount; i++) {
-          row.cells[i].querySelector("input").value = "";
+          let input = row.cells[i].querySelector("input");
+          input.value = "";
+          input.classList.add("empty");
+          input.classList.remove("filled");
         }
         row.cells[2 + daysCount].textContent = "";
       }
